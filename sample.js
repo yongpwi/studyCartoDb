@@ -7,6 +7,8 @@ var volumeChart = dc.barChart('#monthly-volume-chart');
 var gainOrLossChart = dc.pieChart('#gain-loss-chart');
 var joinND = dc.numberDisplay("#joinNumber");
 var outND = dc.numberDisplay("#outNumber");
+var reasonChart = dc.rowChart("#reason-chart");
+var reasonChart2 = dc.rowChart("#reason-chart2");
 
 
 //var hourChart = dc.barChart("#hour-chart");
@@ -14,22 +16,23 @@ var outND = dc.numberDisplay("#outNumber");
 //var sourceChart = dc.rowChart("#source-chart");
 //var statusChart = dc.rowChart("#status-chart");
 //var neighborhoodChart = dc.rowChart("#neighborhood-chart");
-var reasonChart = dc.rowChart("#reason-chart");
-var reasonChart2 = dc.rowChart("#reason-chart2");
 //var openDaysChart = dc.rowChart("#opendays-chart");
-var dataTable = dc.dataTable("#data-table");
-var dataCount = dc.dataCount('.data-count');
+//var dataTable = dc.dataTable("#data-table");
+//var dataCount = dc.dataCount('.data-count');
 
 var allCharts = [
     {chart: dateChart, id: "#date-chart"},
+    {chart: volumeChart, id: "#monthly-volume-chart"},
     {chart: gainOrLossChart, id: "#gain-loss-chart"},
+    {chart: joinND, id: "#joinNumber"},
+    {chart: outND, id: "#outNumber"},
+    {chart: reasonChart, id: "#reason-chart"},
+    {chart: reasonChart2, id: "#reason-chart2"}
     //{chart: hourChart, id: "#hour-chart"},
     //{chart: dayChart,  id: "#day-chart"},
     //{chart: sourceChart, id: "#source-chart"},
     //{chart: statusChart, id: "#status-chart"},
     //{chart: neighborhoodChart, id: "#neighborhood-chart"},
-    {chart: reasonChart, id: "#reason-chart"},
-    {chart: reasonChart2, id: "#reason-chart2"},
     //{chart: openDaysChart, id: "#opendays-chart"}
 ];
 
@@ -39,20 +42,39 @@ var singleColor2 = ["#1a8bba", "#d73027"];
 
 
 var smallIcon = L.divIcon({className: "small-div-marker"});
-var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60});
 
-var map = L.map('map', {
-    zoomControl: true,
-    center: [37.67295135774715, 127.09396362304688],
-    maxZoom: 18,
-    zoom: 9,
-    layers: [mapClustersLayer]
-});
+function updateProgressBar(processed, total, elapsed, layersArray) {
+    if (elapsed > 1000) {
+        // if it takes more than a second to load, display the progress bar:
+        progress.style.display = 'block';
+        progressBar.style.width = Math.round(processed/total*100) + '%';
+    }
 
-L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',{
-    attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>',
-    maxZoom:18
-}).addTo(map);
+    if (processed === total) {
+        // all markers processed - hide the progress bar:
+        progress.style.display = 'none';
+    }
+}
+
+//var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60, chunkedLoading: true, chunkProgress: updateProgressBar});
+var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60, chunkedLoading: true});
+
+var tiles = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
+    });
+
+var latlng = L.latLng(37.67295135774715, 127.09396362304688);
+
+var map = L.map('map', { center: latlng, zoom: 9, layers: [tiles] });
+
+//var map = L.map('map', {
+//    zoomControl: true,
+//    center: [37.67295135774715, 127.09396362304688],
+//    maxZoom: 18,
+//    zoom: 9
+//    //layers: [mapClustersLayer]
+//});
 
 var locations = null;
 var onFiltered = function(chart, filter) {
@@ -60,6 +82,7 @@ var onFiltered = function(chart, filter) {
 };
 
 var updateMap = function(locs) {
+    var markerList = [];
     mapClustersLayer.clearLayers();
 
     cartodb.createLayer(map, 'https://sphinfo.cartodb.com/api/v2/viz/531c05b4-c0c5-11e5-966d-42010a14800c/viz.json')
@@ -81,9 +104,9 @@ var updateMap = function(locs) {
     //    cartodb.log.log("some error occurred");
     //});
 
-    var markers = locs.map(function(item){
+    locs.map(function(item){
         if( item.g.latitude!=null && item.g.latitude!=undefined) {
-            return L.marker([item.g.latitude, item.g.longitude],
+            var marker =  L.marker([item.g.latitude, item.g.longitude],
                 {icon: smallIcon}).bindPopup(
                 item.t +
                 "<br/>" + item.l +
@@ -92,10 +115,12 @@ var updateMap = function(locs) {
                 "<br/><strong>Status: </strong>" + item.a
             );
         }
+        markerList.push(marker);
     });
 
 
-    mapClustersLayer.addLayers(markers);
+    mapClustersLayer.addLayers(markerList);
+    map.addLayer(mapClustersLayer);
 };
 
 var today = new Date();
@@ -122,7 +147,8 @@ var boston_data_url = "https://data.cityofboston.gov/resource/awu8-dc52.csv?" +
     "$where=open_dt>'" + tda_date + "'";
 
 //var cartoDbJsonUrl = "SELECT * FROM table_29_20131106";
-var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc";
+var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc LIMIT 25000";
+//var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc";
 var cartoDbFile = "http://localhost:63342/studyCartoDb/sampleData/Restricted2.csv";
 
 //d3.csv(cartoDbFile, function(err, data) {
@@ -133,9 +159,6 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     var dateFormat = d3.time.format("%m-%d-%Y");
     $.each(data.rows, function(index, d) {
     //data.forEach(function(d) {
-        if(d.date == '' || d.date == null){
-            alert("########");
-        }
         d.date_opened = dateFormat.parse(d.date);
         //d.date_outed = (d.outdate == "") ? "" : dateFormat.parse(d.outdate);
         //d.date_opened = dateFormat.parse(d.d);
@@ -143,7 +166,7 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         //d.date_closed = (d.c !== "") ? dateFormat.parse(d.c) : today;
         var lon = d.x;
         var lat = d.y;
-        d.cable_name = (d.cable_name !== "") ? d.cable_name : "Not reported";
+        //d.cable_name = (d.cable_name !== "") ? d.cable_name : "Not reported";
 
         //var lat = d.g.split(',')[0].slice(1);
         //var lon = d.g.split(',')[1].slice(0,-1);
@@ -198,16 +221,19 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     //    }
     //);
 
-    var open_hours = index.dimension( function(d) { return d.date_opened.getHours()+1; } );
-    var open_days = index.dimension( function(d) {
-        var day = d.date_opened.getDay();
-        var name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        return day + '.' + name[day];
-    });
+    //var open_hours = index.dimension( function(d) { return d.date_opened.getHours()+1; } );
+    //var open_days = index.dimension( function(d) {
+    //    var day = d.date_opened.getDay();
+    //    var name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    //    return day + '.' + name[day];
+    //});
 
     var status = index.dimension( function(d) {
         return (d.is_reg == true)  ? '가입' : '탈퇴';
     } );
+    //var status = index.dimension( function(d) {
+    //    return d.is_reg;
+    //} );
 
     var joinCnt = status.group().reduceSum(
         function(d) {
@@ -229,10 +255,28 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         }
     );
 
+    //var joinReasons = index.dimension( function(d) { return d.is_reg; } );
     //var neighborhoods = index.dimension( function(d) { return d.n; } );
-    var reasons = index.dimension( function(d) { return d.cable_name; } );
+    //var joinReasons = index.dimension( function(d) {
+    //    return (d.is_reg == true)  ? '가입' : '탈퇴';
+    //});
+    var joinReasons = index.dimension(
+        function(d) {
+            if(d.is_reg == true){
+                return d.cable_name;
+            }
+        }
+    );
 
-    var joinReasons = reasons.group().reduceSum(function(d){
+    var outReasons = index.dimension(
+        function(d) {
+            if(d.is_reg == false ){
+                return d.cable_name;
+            }
+        }
+    );
+
+    var joinReasonsGroup = joinReasons.group().reduceSum(function(d){
         if (d.is_reg == true) {
             return 1;
         } else {
@@ -240,7 +284,7 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         }
     });
 
-    var outReasons = reasons.group().reduceSum(function(d){
+    var outReasonsGroup = outReasons.group().reduceSum(function(d){
         if (d.is_reg == false) {
             return 1;
         } else {
@@ -251,15 +295,15 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     locations = index.dimension( function(d) { return d.g; });
     //var days_open = index.dimension( function(d) { return d.time_to_close; });
 
-    dataCount
-        .dimension(index)
-        .group(all);
+    //dataCount
+    //    .dimension(index)
+    //    .group(all);
 
     dateChart
         .width($('#date-chart').innerWidth()-30)
         .height(200)
         .margins({top: 10, left:40, right: 30, bottom:20})
-        .rangeChart(volumeChart)
+        //.rangeChart(volumeChart)
         //.x(d3.time.scale().domain([new Date(2014, 12, 1), today]))
         .x(d3.time.scale().domain([new Date(2014, 11, 1), new Date(2017, 12, 1)]))
         //.colors(singleColor2)
@@ -333,6 +377,7 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         .xUnits(d3.time.months);
 
     volumeChart.yAxis().ticks(0);
+
     //Specify an area chart by using a line chart with `.renderArea(true)`.
     // <br>API: [Stack Mixin](https://github.com/dc-js/dc.js/blob/master/web/docs/api-latest.md#stack-mixin),
     // [Line Chart](https://github.com/dc-js/dc.js/blob/master/web/docs/api-latest.md#line-chart)
@@ -477,8 +522,8 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(singleColor)
-        .group(joinReasons)
-        .dimension(reasons)
+        .group(joinReasonsGroup)
+        .dimension(joinReasons)
         .elasticX(true)
         .gap(1)
         .ordering(function(i){return -i.value;})
@@ -490,8 +535,8 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(outColor)
-        .group(outReasons)
-        .dimension(reasons)
+        .group(outReasonsGroup)
+        .dimension(outReasons)
         .elasticX(true)
         .gap(1)
         .ordering(function(i){return -i.value;})
@@ -510,30 +555,30 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     //    .labelOffsetY(12)
     //    .xAxis().ticks(3);
 
-    dataTable
-        .dimension(open_dates)
-        .group(function (d) {
-            return tda_date + " &ndash; present";
-        })
-        .size(100) // (optional) max number of records to be shown, :default = 25
-        .columns([
-            function(d) { return d.d; },
-            function(d) { return d.id; },
-            //function(d) { return d.a; },
-            function(d) {
-                var joinType = "가입";
-                //if(d.outDate != ""){
-                //    joinType = "해지"
-                //}
-                return joinType;
-            },
-            function(d) { return d.type; }
-            ////function(d) { return d.l; },
-            ////function(d) { return d.s; },
-            //function(d) { return d.c_exp; }
-        ])
-        .sortBy( function(d) { return d.d })
-        .order(d3.descending);
+    //dataTable
+    //    .dimension(open_dates)
+    //    .group(function (d) {
+    //        return tda_date + " &ndash; present";
+    //    })
+    //    .size(100) // (optional) max number of records to be shown, :default = 25
+    //    .columns([
+    //        function(d) { return d.d; },
+    //        function(d) { return d.id; },
+    //        //function(d) { return d.a; },
+    //        function(d) {
+    //            var joinType = "가입";
+    //            //if(d.outDate != ""){
+    //            //    joinType = "해지"
+    //            //}
+    //            return joinType;
+    //        },
+    //        function(d) { return d.type; }
+    //        ////function(d) { return d.l; },
+    //        ////function(d) { return d.s; },
+    //        //function(d) { return d.c_exp; }
+    //    ])
+    //    .sortBy( function(d) { return d.d })
+    //    .order(d3.descending);
 
     dc.renderAll();
     updateMap(locations.top(Infinity));
