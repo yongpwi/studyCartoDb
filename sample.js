@@ -147,7 +147,7 @@ var boston_data_url = "https://data.cityofboston.gov/resource/awu8-dc52.csv?" +
     "$where=open_dt>'" + tda_date + "'";
 
 //var cartoDbJsonUrl = "SELECT * FROM table_29_20131106";
-var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc LIMIT 25000";
+var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc LIMIT 20000";
 //var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc";
 var cartoDbFile = "http://localhost:63342/studyCartoDb/sampleData/Restricted2.csv";
 
