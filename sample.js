@@ -27,11 +27,29 @@ var singleColor2 = ["#1a8bba", "#d73027"];
 
 var smallIcon = L.divIcon({className: "small-div-marker"});
 
+var progressMod = document.getElementById('progress2');
 var progress = document.getElementById('progress');
 var progressBar = document.getElementById('progress-bar');
 
+//var circle = new ProgressBar.Circle(progressMod, {
+//    color: '#FCB03C',
+//    strokeWidth: 3,
+//    trailWidth: 1,
+//    duration: 1500,
+//    text: {
+//        value: '0'
+//    },
+//    step: function(state, bar) {
+//        bar.setText((bar.value() * 100).toFixed(0));
+//    }
+//});
+
+//circle.animate(1, function() {
+//    circle.animate(0);
+//});
 function updateProgressBar(processed, total, elapsed, layersArray) {
-    if (elapsed > 1000) {
+
+    if (elapsed > 100) {
         // if it takes more than a second to load, display the progress bar:
         progress.style.display = 'block';
         progressBar.style.width = Math.round(processed/total*100) + '%';
@@ -95,11 +113,9 @@ var updateMap = function(locs) {
         if( item.g.latitude!=null && item.g.latitude!=undefined) {
             var marker =  L.marker([item.g.latitude, item.g.longitude],
                 {icon: smallIcon}).bindPopup(
-                item.t +
-                "<br/>" + item.l +
-                "<br/><strong>Enquiry ID:</strong>" + item.id +
-                "<br/><strong>Opened: </strong>" + item.d +
-                "<br/><strong>Status: </strong>" + item.a
+                "<br/><strong>상태 : </strong>" + item.is_reg +
+                "<br/><strong>케이블 회사 : </strong>" + item.join_cable_name +
+                "<br/><strong>날짜 : </strong>" + item.date
             );
         }
         markerList.push(marker);
@@ -134,7 +150,7 @@ var boston_data_url = "https://data.cityofboston.gov/resource/awu8-dc52.csv?" +
     "$where=open_dt>'" + tda_date + "'";
 
 //var cartoDbJsonUrl = "SELECT * FROM table_29_20131106";
-var cartoDbJsonUrl = "SELECT * FROM  public3_mod LIMIT 8000";
+var cartoDbJsonUrl = "SELECT * FROM  public3_mod";
 //var cartoDbJsonUrl = "SELECT * FROM public2 LIMIT 20000";
 //var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc";
 var cartoDbFile = "http://localhost:63342/studyCartoDb/sampleData/Restricted2.csv";
@@ -218,33 +234,58 @@ d3.json('https://yhhan.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err,
         }
     );
 
-    var joinCableNmDimension = index.dimension(function(d){
-        if(d.is_reg_mod == 1){
-            return d.join_cable_name;
+    //var joinCableNmDimension = index.dimension(function(d){
+    //        return d.join_cable_name;
+    //});
+
+    //var outCableNmDimension = index.dimension(function(d){
+    //    if(d.is_reg_mod == 0){
+    //        return d.join_cable_name;
+    //    }
+    //});
+
+    var cableCdDimension = index.dimension(function(d){
+        return [d.cable_cd, d.join_cable_name];
+        //return [d.is_reg, d.join_cable_name +'['+ d.cable_cd +']'];
+    });
+    var cableCdDimension2 = index.dimension(function(d){
+        return [d.cable_cd, d.out_cable_name];
+        //return [d.is_reg_mod, d.out_cable_name + '[' + d.cable_cd + ']'];
+    });
+
+    var joinCableGroup = cableCdDimension.group(function(d){
+        if(d[0] > 0){
+            return d[1];
         }
     });
 
-    var outCableNmDimension = index.dimension(function(d){
-        if(d.is_reg_mod == 0){
-            return d.join_cable_name;
-        }
-    });
+    //var joinCableNmGroup = joinCableNmDimension.group().reduceSum(function(d){
+    //    if (d.is_reg_mod == 1) {
+    //        return 1;
+    //    } else {
+    //        return 0;
+    //    }
+    //});
 
-    var joinCableNmGroup = joinCableNmDimension.group().reduceSum(function(d){
-        if (d.is_reg_mod == 1) {
-            return 1;
-        } else {
-            return 0;
-        }
-    });
+    //var outCableNmGroup = outCableNmDimension.group().reduceSum(function(d){
+    //    if (d.is_reg_mod == 0) {
+    //        return 1;
+    //    } else {
+    //        return 0;
+    //    }
+    //});
 
-    var outCableNmGroup = outCableNmDimension.group().reduceSum(function(d){
-        if (d.is_reg_mod == 0) {
-            return 1;
-        } else {
-            return 0;
-        }
-    });
+    var filtered_tt2 = remove_empty_bins(cableCdDimension2.group());
+
+    function remove_empty_bins(source_group) {
+        return {
+            all:function () {
+                return source_group.all().filter(function(d) {
+                    return d.key[0] < 0;
+                });
+            }
+        };
+    }
 
     dateChart
         .width($('#date-chart').innerWidth()-30)
@@ -338,8 +379,8 @@ d3.json('https://yhhan.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err,
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(singleColor)
-        .group(joinCableNmGroup)
-        .dimension(joinCableNmDimension)
+        .group(joinCableGroup)
+        .dimension(cableCdDimension)
         .label( function(i) {
             return i.key; })
         .elasticX(true)
@@ -353,10 +394,10 @@ d3.json('https://yhhan.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err,
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(outColor)
-        .group(outCableNmGroup)
-        .dimension(outCableNmDimension)
+        .group(filtered_tt2)
+        .dimension(cableCdDimension2)
         .label( function(i) {
-            return i.key; })
+            return i.key[1]; })
         .elasticX(true)
         .gap(1)
         //.renderTitleLabel(true)
