@@ -10,16 +10,6 @@ var outND = dc.numberDisplay("#outNumber");
 var reasonChart = dc.rowChart("#reason-chart");
 var reasonChart2 = dc.rowChart("#reason-chart2");
 
-
-//var hourChart = dc.barChart("#hour-chart");
-//var dayChart = dc.rowChart("#day-chart");
-//var sourceChart = dc.rowChart("#source-chart");
-//var statusChart = dc.rowChart("#status-chart");
-//var neighborhoodChart = dc.rowChart("#neighborhood-chart");
-//var openDaysChart = dc.rowChart("#opendays-chart");
-//var dataTable = dc.dataTable("#data-table");
-//var dataCount = dc.dataCount('.data-count');
-
 var allCharts = [
     {chart: dateChart, id: "#date-chart"},
     {chart: volumeChart, id: "#monthly-volume-chart"},
@@ -28,12 +18,6 @@ var allCharts = [
     {chart: outND, id: "#outNumber"},
     {chart: reasonChart, id: "#reason-chart"},
     {chart: reasonChart2, id: "#reason-chart2"}
-    //{chart: hourChart, id: "#hour-chart"},
-    //{chart: dayChart,  id: "#day-chart"},
-    //{chart: sourceChart, id: "#source-chart"},
-    //{chart: statusChart, id: "#status-chart"},
-    //{chart: neighborhoodChart, id: "#neighborhood-chart"},
-    //{chart: openDaysChart, id: "#opendays-chart"}
 ];
 
 var singleColor = ["#1a8bba"];
@@ -42,6 +26,9 @@ var singleColor2 = ["#1a8bba", "#d73027"];
 
 
 var smallIcon = L.divIcon({className: "small-div-marker"});
+
+var progress = document.getElementById('progress');
+var progressBar = document.getElementById('progress-bar');
 
 function updateProgressBar(processed, total, elapsed, layersArray) {
     if (elapsed > 1000) {
@@ -57,7 +44,7 @@ function updateProgressBar(processed, total, elapsed, layersArray) {
 }
 
 //var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60, chunkedLoading: true, chunkProgress: updateProgressBar});
-var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60, chunkedLoading: true});
+var mapClustersLayer = L.markerClusterGroup({maxClusterRadius: 60, chunkedLoading: true, chunkProgress: updateProgressBar});
 
 var tiles = L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
         maxZoom: 18,
@@ -147,12 +134,14 @@ var boston_data_url = "https://data.cityofboston.gov/resource/awu8-dc52.csv?" +
     "$where=open_dt>'" + tda_date + "'";
 
 //var cartoDbJsonUrl = "SELECT * FROM table_29_20131106";
-var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc LIMIT 20000";
+var cartoDbJsonUrl = "SELECT * FROM  public3_mod LIMIT 8000";
+//var cartoDbJsonUrl = "SELECT * FROM public2 LIMIT 20000";
 //var cartoDbJsonUrl = "SELECT * FROM  t_cable_customer_loc";
 var cartoDbFile = "http://localhost:63342/studyCartoDb/sampleData/Restricted2.csv";
 
 //d3.csv(cartoDbFile, function(err, data) {
-d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err, data) {
+d3.json('https://yhhan.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err, data) {
+//d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err, data) {
     //var dateFormat = d3.time.format("%Y-%m-%dT%H:%M:%S");
     //var dateFormat = d3.time.format("%Y-%m-%d");
     //var dateFormat = d3.time.format("%m/%d/%Y %H:%M:%S %p");
@@ -179,15 +168,16 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     //var index = crossfilter(data);
     var all = index.groupAll();
 
-    //var sources = index.dimension( function(d) { return d.s; });
-    //var open_dates = index.dimension( function(d) { return d3.time.day(d.date_opened); } );
-    //var open_dates = index.dimension( function(d) { return d3.time.day(d.date_opened); } );
+    locations = index.dimension( function(d) { return d.g; });
+
+    updateMap(locations.top(Infinity));
+
     var open_dates = index.dimension( function(d) { return d3.time.day(d.date_opened); } );
 
 
     var volumeByMonthGroup = open_dates.group().reduceSum(
         function(d) {
-            if (d.is_reg == true) {
+            if (d.is_reg_mod == 1) {
                 return 1;
             } else {
                 return 0;
@@ -196,48 +186,21 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
     );
     var volumeByMonthGroup2 = open_dates.group().reduceSum(
         function(d) {
-            if (d.is_reg == false) {
+            if (d.is_reg_mod == 0) {
                 return 1;
             } else {
                 return 0;
             }
         }
     );
-    //var volumeByMonthGroup2 = open_dates.group().reduce(
-    //    function (p, v) {
-    //        if(v.is_reg == false){
-    //            ++p.outCount;
-    //        }
-    //        return p;
-    //    },
-    //    function (p, v) {
-    //        if(v.is_reg == false){
-    //            --p.outCount;
-    //        }
-    //        return p;
-    //    },
-    //    function () {
-    //        return {outCount: 0};
-    //    }
-    //);
-
-    //var open_hours = index.dimension( function(d) { return d.date_opened.getHours()+1; } );
-    //var open_days = index.dimension( function(d) {
-    //    var day = d.date_opened.getDay();
-    //    var name = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    //    return day + '.' + name[day];
-    //});
 
     var status = index.dimension( function(d) {
-        return (d.is_reg == true)  ? '가입' : '탈퇴';
+        return d.is_reg;
     } );
-    //var status = index.dimension( function(d) {
-    //    return d.is_reg;
-    //} );
 
     var joinCnt = status.group().reduceSum(
         function(d) {
-            if (d.is_reg == true) {
+            if (d.is_reg_mod == 1) {
                 return 1;
             } else {
                 return 0;
@@ -247,7 +210,7 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
 
     var outCnt = status.group().reduceSum(
         function(d) {
-            if (d.is_reg == false) {
+            if (d.is_reg_mod == 0) {
                 return 1;
             } else {
                 return 0;
@@ -255,90 +218,46 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         }
     );
 
-    //var joinReasons = index.dimension( function(d) { return d.is_reg; } );
-    //var neighborhoods = index.dimension( function(d) { return d.n; } );
-    //var joinReasons = index.dimension( function(d) {
-    //    return (d.is_reg == true)  ? '가입' : '탈퇴';
-    //});
-    var joinReasons = index.dimension(
-        function(d) {
-            if(d.is_reg == true){
-                return d.cable_name;
-            }
+    var joinCableNmDimension = index.dimension(function(d){
+        if(d.is_reg_mod == 1){
+            return d.join_cable_name;
         }
-    );
+    });
 
-    var outReasons = index.dimension(
-        function(d) {
-            if(d.is_reg == false ){
-                return d.cable_name;
-            }
+    var outCableNmDimension = index.dimension(function(d){
+        if(d.is_reg_mod == 0){
+            return d.join_cable_name;
         }
-    );
+    });
 
-    var joinReasonsGroup = joinReasons.group().reduceSum(function(d){
-        if (d.is_reg == true) {
+    var joinCableNmGroup = joinCableNmDimension.group().reduceSum(function(d){
+        if (d.is_reg_mod == 1) {
             return 1;
         } else {
             return 0;
         }
     });
 
-    var outReasonsGroup = outReasons.group().reduceSum(function(d){
-        if (d.is_reg == false) {
+    var outCableNmGroup = outCableNmDimension.group().reduceSum(function(d){
+        if (d.is_reg_mod == 0) {
             return 1;
         } else {
             return 0;
         }
     });
-
-    locations = index.dimension( function(d) { return d.g; });
-    //var days_open = index.dimension( function(d) { return d.time_to_close; });
-
-    //dataCount
-    //    .dimension(index)
-    //    .group(all);
 
     dateChart
         .width($('#date-chart').innerWidth()-30)
         .height(200)
         .margins({top: 10, left:40, right: 30, bottom:20})
-        //.rangeChart(volumeChart)
-        //.x(d3.time.scale().domain([new Date(2014, 12, 1), today]))
         .x(d3.time.scale().domain([new Date(2014, 11, 1), new Date(2017, 12, 1)]))
-        //.colors(singleColor2)
         .dimension(open_dates)
-        //.group(volumeByMonthGroup2, 'Monthly Index Average')
-        //.renderArea(true)
-        //.valueAccessor(function (d) {
-        //    return d.value.joinCount;
-        //})
-        //.renderArea(true)
         .elasticY(true)
         .renderHorizontalGridLines(true)
-        //##### Legend
-
 
         // Position the legend relative to the chart origin and specify items' height and separation.
         .legend(dc.legend().x(880).y(0).itemHeight(13).gap(5))
         .brushOn(false)
-        // Add the base layer of the stack with group. The second parameter specifies a series name for use in the
-        // legend.
-        // Stack additional layers with `.stack`. The first paramenter is a new group.
-        // The second parameter is the series name. The third is a value accessor.
-        //.stack(open_dates.group(), 'Monthly Index Move', function (d) {
-        //    return d.value + 50;
-        //})
-        //// The `.valueAccessor` will be used for the base layer
-        //.group(open_dates.group(), 'Monthly Index Average')
-        //.valueAccessor(function (d) {
-        //    return d.value.avg;
-        //})
-        //// Stack additional layers with `.stack`. The first paramenter is a new group.
-        //// The second parameter is the series name. The third is a value accessor.
-        //.stack(volumeByMonthGroup, 'Monthly Index Move', function (d) {
-        //    return d.value.outCount;
-        //})
 
         .compose([
             dc.lineChart(dateChart)
@@ -378,50 +297,6 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
 
     volumeChart.yAxis().ticks(0);
 
-    //Specify an area chart by using a line chart with `.renderArea(true)`.
-    // <br>API: [Stack Mixin](https://github.com/dc-js/dc.js/blob/master/web/docs/api-latest.md#stack-mixin),
-    // [Line Chart](https://github.com/dc-js/dc.js/blob/master/web/docs/api-latest.md#line-chart)
-    //moveChart /* dc.lineChart('#monthly-move-chart', 'chartGroup') */
-    //    .renderArea(true)
-    //    .width(990)
-    //    .height(200)
-    //    .transitionDuration(1000)
-    //    .margins({top: 30, right: 50, bottom: 25, left: 40})
-    //    .dimension(moveMonths)
-    //    .mouseZoomable(true)
-    //    // Specify a "range chart" to link its brush extent with the zoom of the current "focus chart".
-    //    .rangeChart(volumeChart)
-    //    .x(d3.time.scale().domain([new Date(1985, 0, 1), new Date(2012, 11, 31)]))
-    //    .round(d3.time.month.round)
-    //    .xUnits(d3.time.months)
-    //    .elasticY(true)
-    //    .renderHorizontalGridLines(true)
-    //    //##### Legend
-    //
-    //    // Position the legend relative to the chart origin and specify items' height and separation.
-    //    .legend(dc.legend().x(800).y(10).itemHeight(13).gap(5))
-    //    .brushOn(false)
-    //    // Add the base layer of the stack with group. The second parameter specifies a series name for use in the
-    //    // legend.
-    //    // The `.valueAccessor` will be used for the base layer
-    //    .group(indexAvgByMonthGroup, 'Monthly Index Average')
-    //    .valueAccessor(function (d) {
-    //        return d.value.avg;
-    //    })
-    //    // Stack additional layers with `.stack`. The first paramenter is a new group.
-    //    // The second parameter is the series name. The third is a value accessor.
-    //    .stack(monthlyMoveGroup, 'Monthly Index Move', function (d) {
-    //        return d.value;
-    //    })
-    //    // Title can be called by any stack layer.
-    //    .title(function (d) {
-    //        var value = d.value.avg ? d.value.avg : d.value;
-    //        if (isNaN(value)) {
-    //            value = 0;
-    //        }
-    //        return dateFormat(d.key) + '\n' + numberFormat(value);
-    //    });
-
     gainOrLossChart /* dc.pieChart('#gain-loss-chart', 'chartGroup') */
         // (_optional_) define chart width, `default = 200`
         .width(180)
@@ -457,73 +332,16 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         .formatNumber(d3.format(",d"))
         .valueAccessor(function(d) { return d.value; });
 
-    //hourChart
-    //    .width($('#hour-chart').innerWidth()-30)
-    //    .height(250)
-    //    .margins({top: 10, left:35, right: 10, bottom:20})
-    //    .x(d3.scale.linear().domain([1,24]))
-    //    .colors(singleColor)
-    //    .dimension(open_hours)
-    //    .group(open_hours.group())
-    //    .gap(1)
-    //    .elasticY(true);
-
-    //dayChart
-    //    .width($('#day-chart').innerWidth()-30)
-    //    .height(183)
-    //    .margins({top: 10, left:5, right: 10, bottom:-1})
-    //    .label( function(i) { return i.key.split('.')[1]; })
-    //    .title( function(i) { return i.key.split('.')[1] + ': ' + i.value; })
-    //    .colors(singleColor)
-    //    .dimension(open_days)
-    //    .group(open_days.group())
-    //    .elasticX(true)
-    //    .gap(1)
-    //    .xAxis().ticks(0);
-
-    //statusChart
-    //    .width($('#status-chart').innerWidth()-30)
-    //    .height(60)
-    //    .margins({top: 10, left:5, right: 10, bottom:-1})
-    //    .colors(singleColor)
-    //    .group(status.group())
-    //    .gap(1)
-    //    .dimension(status)
-    //    .elasticX(true)
-    //    .xAxis().ticks(0);
-
-    //sourceChart
-    //    .width($('#source-chart').innerWidth()-30)
-    //    .height(158)
-    //    .margins({top: 10, left:5, right: 10, bottom:-1})
-    //    .colors(singleColor)
-    //    .group(sources.group())
-    //    .dimension(sources)
-    //    .elasticX(true)
-    //    .gap(1)
-    //    .ordering(function(i){return -i.value;})
-    //    .xAxis().ticks(0);
-
-    //neighborhoodChart
-    //    .width($('#neighborhood-chart').innerWidth()-30)
-    //    .height(435)
-    //    .margins({top: 10, left:5, right: 10, bottom:20})
-    //    .colors(singleColor)
-    //    .group(neighborhoods.group())
-    //    .dimension(neighborhoods)
-    //    .elasticX(true)
-    //    .gap(1)
-    //    .ordering(function(i){return -i.value;})
-    //    .labelOffsetY(12)
-    //    .xAxis().ticks(3);
 
     reasonChart
         .width($('#reason-chart').innerWidth()-30)
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(singleColor)
-        .group(joinReasonsGroup)
-        .dimension(joinReasons)
+        .group(joinCableNmGroup)
+        .dimension(joinCableNmDimension)
+        .label( function(i) {
+            return i.key; })
         .elasticX(true)
         .gap(1)
         .ordering(function(i){return -i.value;})
@@ -535,54 +353,21 @@ d3.json('https://yjlee2.cartodb.com/api/v2/sql/?q='+cartoDbJsonUrl, function(err
         .height(500)
         .margins({top: 10, left:5, right: 10, bottom:20})
         .ordinalColors(outColor)
-        .group(outReasonsGroup)
-        .dimension(outReasons)
+        .group(outCableNmGroup)
+        .dimension(outCableNmDimension)
+        .label( function(i) {
+            return i.key; })
         .elasticX(true)
         .gap(1)
+        //.renderTitleLabel(true)
         .ordering(function(i){return -i.value;})
         .labelOffsetY(12)
         .xAxis().ticks(3);
 
-    //openDaysChart
-    //    .width($('#opendays-chart').innerWidth()-30)
-    //    .height(533)
-    //    .margins({top: 10, left:5, right: 10, bottom:20})
-    //    .colors(singleColor)
-    //    .group(days_open.group())
-    //    .dimension(days_open)
-    //    .elasticX(true)
-    //    .gap(1)
-    //    .labelOffsetY(12)
-    //    .xAxis().ticks(3);
-
-    //dataTable
-    //    .dimension(open_dates)
-    //    .group(function (d) {
-    //        return tda_date + " &ndash; present";
-    //    })
-    //    .size(100) // (optional) max number of records to be shown, :default = 25
-    //    .columns([
-    //        function(d) { return d.d; },
-    //        function(d) { return d.id; },
-    //        //function(d) { return d.a; },
-    //        function(d) {
-    //            var joinType = "가입";
-    //            //if(d.outDate != ""){
-    //            //    joinType = "해지"
-    //            //}
-    //            return joinType;
-    //        },
-    //        function(d) { return d.type; }
-    //        ////function(d) { return d.l; },
-    //        ////function(d) { return d.s; },
-    //        //function(d) { return d.c_exp; }
-    //    ])
-    //    .sortBy( function(d) { return d.d })
-    //    .order(d3.descending);
+    reasonChart.onClick = function() {};
+    reasonChart2.onClick = function() {};
 
     dc.renderAll();
-    updateMap(locations.top(Infinity));
-console.log(all);
 });
 
 window.onresize = function(event) {
