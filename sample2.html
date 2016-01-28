@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Leaflet example | CartoDB.js</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <link rel="shortcut icon" href="http://cartodb.com/assets/favicon.ico" />
+
+    <!-- bootstrap -->
+    <!--Latest compiled and minified CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css">
+
+    <style>
+        html, body {
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+        #map {
+            height: 518px;
+        }
+    </style>
+    <link rel="stylesheet" href="css/sample.css" />
+    <link rel="stylesheet" href="http://libs.cartocdn.com/cartodb.js/v3/3.15/themes/css/cartodb.css" />
+</head>
+<body id="bodyId">
+<div class="container-fluid">
+    <div id="progress2"></div>
+    <div id="progress"><div id="progress-bar"></div></div>
+    <div class="row" style="padding-top: 15px;">
+        <div class="col-md-12">
+            <div style="padding-right: 15px;padding-left: 15px;">
+                <div id="map"></div>
+                <div class="dropdown" style="padding-top: 15px;">
+                    <button class="btn btn-default dropdown-toggle" type="button" id="dropdownMenu1" data-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
+                        <span id="selectedName">Change Layer</span>
+                        <span class="caret"></span>
+                    </button>
+                    <ul class="dropdown-menu" aria-labelledby="dropdownMenu1">
+                        <li data=""><a href="#">Change Layer</a></li>
+                        <li data="layer1"><a href="#">Heatmap</a></li>
+                        <li data="layer2"><a href="#">Torque Cat</a></li>
+                        <li data="layer3"><a href="#">Choropleth</a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- include cartodb.js library -->
+<script src="http://libs.cartocdn.com/cartodb.js/v3/3.15/cartodb.js"></script>
+<script src="http://code.jquery.com/jquery-1.12.0.min.js"></script>
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+<!-- bootstrap end -->
+
+<script src="/studyCartoDb/js/ProgressBar.js"></script>
+
+<script>
+    $(document).ready(function(){
+        init();
+        $('.dropdown-menu li').click(function(){
+            $('#selectedName').text(this.textContent);
+            addLayer($(this).attr('data'));
+        });
+    });
+
+    var map;
+    var myCustomLayer;
+    function init(){
+        // initiate leaflet map
+        map = new L.Map('map', {
+            center: [37.67295135774715, 127.09396362304688],
+            zoom: 9
+        })
+
+        L.tileLayer('http://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, &copy; <a href="http://cartodb.com/attributions">CartoDB</a>'
+        }).addTo(map);
+
+        var layerUrl = 'https://sphinfo.cartodb.com/api/v2/viz/531c05b4-c0c5-11e5-966d-42010a14800c/viz.json';
+        var layerUrl2 = 'https://yjlee2.cartodb.com/api/v2/viz/7660723c-bf74-11e5-ac46-0e674067d321/viz.json';
+
+
+        cartodb.createLayer(map, layerUrl)
+                .addTo(map, 0)
+                .on('done', function(layer) {
+                }).on('error', function() {
+            //log the error
+        });
+
+        cartodb.createLayer(map, layerUrl2)
+                .addTo(map, 1)
+                .on('done', function(layer) {
+                }).on('error', function() {
+            //log the error
+        });
+
+    }
+
+    function addLayer(obj){
+        var callUrl = "";
+        if(myCustomLayer){
+            myCustomLayer.remove();
+        }
+        if(obj == "layer1"){
+            callUrl = "https://yhhan.cartodb.com/api/v2/viz/5749d048-c4db-11e5-bbf6-0ea31932ec1d/viz.json";
+        } else if(obj == "layer2"){
+            callUrl = "https://yhhan.cartodb.com/api/v2/viz/9106b194-c584-11e5-a076-0e787de82d45/viz.json"
+        } else if(obj == "layer3"){
+            callUrl = "https://sph.cartodb.com/u/sphinfo/api/v2/viz/e55743ea-c588-11e5-a5a1-42010a14800c/viz.json";
+        }
+        if(callUrl != ""){
+            createLayer(callUrl);
+        }
+    }
+
+    function createLayer(callUrl){
+        cartodb.createLayer(map, callUrl)
+                .addTo(map, 100)
+                .on('done', function(layer) {
+                    myCustomLayer = layer;
+//                    layer.setInteraction(true);
+                    layer.on('featureOver', function(e, latlng, pos, data) {
+                        cartodb.log.log(e, latlng, pos, data);
+                    });
+                    layer.on('error', function(err) {
+                        cartodb.log.log('error: ' + err);
+                    });
+                }).on('error', function() {
+            cartodb.log.log("some error occurred");
+        });
+    }
+
+</script>
+</body>
+</html>
